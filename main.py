@@ -1,42 +1,37 @@
 from fastapi import FastAPI, Request
-from calendar_utils import get_calendar_service
-from pydantic import BaseModel
-# from agent_flow import ConversationState
-from agent_flow import run_langgraph
-
-
-# state = ConversationState()
-app = FastAPI()
-service = get_calendar_service()
-
-class ChatInput(BaseModel):
-    message: str
-
 from fastapi.responses import RedirectResponse, JSONResponse
-from google_auth_oauthlib.flow import Flow
+from fastapi.middleware.cors import CORSMiddleware
+from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 import os
-import pathlib
-import json
 from dotenv import load_dotenv
+from agent_flow import run_langgraph
 
 load_dotenv()
 
+CLIENT_ID = os.getenv("CLIENT_ID")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+REDIRECT_URI = os.getenv("REDIRECT_URI")
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
+user_tokens = {}
+
 app = FastAPI()
 
-# Load env variables
-CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("REDIRECT_URI")
-SCOPES = ['https://www.googleapis.com/auth/calendar']
-
-# Temporary token storage (for demo use only; use DB for production)
-user_tokens = {}
+# Allow CORS for Streamlit frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
-    return {"message": "Calendar AI is running!"}
+    return {"message": "🚀 AI Calendar Backend is running!"}
 
 @app.get("/authorize")
 def authorize():
@@ -59,7 +54,7 @@ def authorize():
 @app.get("/callback")
 async def oauth_callback(request: Request):
     code = request.query_params.get("code")
-    
+
     flow = Flow.from_client_config(
         {
             "web": {
@@ -75,10 +70,9 @@ async def oauth_callback(request: Request):
     )
 
     flow.fetch_token(code=code)
-
     credentials = flow.credentials
 
-    # For demo, we assume 1 user. In production, identify them by session or token
+    # Save credentials temporarily for demo
     user_tokens["demo_user"] = {
         "token": credentials.token,
         "refresh_token": credentials.refresh_token,
@@ -94,12 +88,12 @@ async def oauth_callback(request: Request):
 def chat(data: dict):
     user_input = data.get("message", "")
     creds_info = user_tokens.get("demo_user")
-    
+
     if not creds_info:
         return {"reply": "❌ User not authenticated. Please visit /authorize."}
 
     creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
     service = build('calendar', 'v3', credentials=creds)
 
-    # Replace this line with actual logic (like LangGraph)
-    return {"reply": f"🔍 Received: {user_input} ✅ Calendar connected."}
+    # Run LangGraph agent logic with real calendar service
+    return {"reply": run_langgraph(user_input)}
