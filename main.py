@@ -131,7 +131,7 @@ def chat(data: dict):
 
         # Build the calendar service
         print("✅ Building calendar service...")
-        service = build('calendar', 'v3', credentials=creds)
+        service = get_calendar_service(creds)
 
         # Run the agent (you might pass `service` to it if needed)
         print("⚙️ Running LangGraph agent...")

@@ -9,8 +9,11 @@ from google.auth.transport.requests import Request
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 def get_calendar_service(creds):
-    if not creds.valid and creds.refresh_token:
-        creds.refresh(Request())
+    if not creds.valid:
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            raise ValueError("Invalid credentials provided.")
     return build("calendar", "v3", credentials=creds)
 
 def check_availability(service, start_iso, end_iso):
