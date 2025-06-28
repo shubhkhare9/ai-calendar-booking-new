@@ -103,14 +103,25 @@ async def oauth_callback(request: Request):
 
 @app.post("/chat")
 def chat(data: dict):
-    user_input = data.get("message", "")
-    creds_info = user_tokens.get("demo_user")
+    try:
+        user_input = data.get("message", "")
+        creds_info = user_tokens.get("demo_user")
 
-    if not creds_info:
-        return {"reply": "❌ User not authenticated. Please visit /authorize."}
+        if not creds_info:
+            return {"reply": "❌ User not authenticated. Please visit /authorize."}
 
-    creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
-    service = build('calendar', 'v3', credentials=creds)
+        creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
 
-    # Run LangGraph agent logic with real calendar service
-    return {"reply": run_langgraph(user_input)}
+        # Validate refresh_token and other required fields
+        required_keys = ["refresh_token", "token_uri", "client_id", "client_secret"]
+        for key in required_keys:
+            if not creds_info.get(key):
+                return {"reply": f"❌ Missing required field: {key}. Please re-authorize."}
+
+        service = build('calendar', 'v3', credentials=creds)
+
+        return {"reply": run_langgraph(user_input)}
+
+    except Exception as e:
+        print("❌ ERROR in /chat route:", str(e))
+        return {"reply": f"❌ Backend error: {str(e)}"}
