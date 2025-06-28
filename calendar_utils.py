@@ -11,25 +11,15 @@ import pickle
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 def get_calendar_service():
-    creds = None
-    # 🔐 Save the token for future runs
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    creds = Credentials(
+        token=None,
+        refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=["https://www.googleapis.com/auth/calendar"]
+    )
 
-    # 🔄 If not valid or missing, re-authenticate
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        # 💾 Save token to reuse next time
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-
-    # ✅ Build the service using saved creds
-    from googleapiclient.discovery import build
     service = build('calendar', 'v3', credentials=creds)
     return service
 
