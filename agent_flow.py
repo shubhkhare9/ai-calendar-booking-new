@@ -237,8 +237,9 @@ workflow.set_finish_point("book")
 calendar_graph = workflow.compile()
 
 def find_free_slots(service, date: datetime.date, duration_minutes=30):
-    start_of_day = datetime.datetime.combine(date, datetime.time(9, 0))
-    end_of_day = datetime.datetime.combine(date, datetime.time(18, 0))
+    IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    start_of_day = datetime.datetime.combine(date, datetime.time(9, 0)).replace(tzinfo=IST)
+    end_of_day = datetime.datetime.combine(date, datetime.time(18, 0)).replace(tzinfo=IST)
 
     events_result = service.events().list(
         calendarId='primary',
@@ -248,15 +249,18 @@ def find_free_slots(service, date: datetime.date, duration_minutes=30):
         orderBy='startTime'
     ).execute()
 
-    busy_times = [(dateutil_parser.parse(e["start"]["dateTime"]),
-                   dateutil_parser.parse(e["end"]["dateTime"]))
-                  for e in events_result.get('items', []) if "dateTime" in e["start"]]
+    busy_times = [
+        (dateutil_parser.parse(e["start"]["dateTime"]),
+         dateutil_parser.parse(e["end"]["dateTime"]))
+        for e in events_result.get("items", []) if "dateTime" in e["start"]
+    ]
 
     current = start_of_day
     free_slots = []
 
     while current + datetime.timedelta(minutes=duration_minutes) <= end_of_day:
-        is_busy = any(start < current + datetime.timedelta(minutes=duration_minutes) and end > current for start, end in busy_times)
+        is_busy = any(start < current + datetime.timedelta(minutes=duration_minutes) and end > current
+                      for start, end in busy_times)
         if not is_busy:
             free_slots.append(current.strftime("%I:%M %p"))
         current += datetime.timedelta(minutes=duration_minutes)
