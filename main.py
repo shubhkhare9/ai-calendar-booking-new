@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from agent_flow import run_langgraph
 import json
+from calendar_utils import get_calendar_service
 
 load_dotenv()
 
@@ -109,6 +110,7 @@ def chat(data: dict):
         # Log credentials being used
         print("🔐 Using credentials:", creds_info)
 
+        # Create the credentials object
         creds = Credentials(
             token=creds_info.get("token"),
             refresh_token=creds_info.get("refresh_token"),
@@ -118,17 +120,20 @@ def chat(data: dict):
             scopes=creds_info.get("scopes", SCOPES)
         )
 
-        # Validate that all required fields are present
+        # Validate all required fields
         if not all([creds.refresh_token, creds.token_uri, creds.client_id, creds.client_secret]):
             return {"reply": "❌ Missing necessary credential fields. Please reauthorize."}
 
+        # Refresh token if expired
         if creds.expired and creds.refresh_token:
             print("🔄 Token expired. Refreshing...")
             creds.refresh(GoogleRequest())
 
+        # Build the calendar service
         print("✅ Building calendar service...")
         service = build('calendar', 'v3', credentials=creds)
 
+        # Run the agent (you might pass `service` to it if needed)
         print("⚙️ Running LangGraph agent...")
         reply = run_langgraph(user_input)
 
@@ -138,4 +143,3 @@ def chat(data: dict):
     except Exception as e:
         print("❌ ERROR in /chat route:", str(e))
         return {"reply": f"❌ Backend error: {str(e)}"}
-

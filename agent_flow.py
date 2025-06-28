@@ -9,6 +9,7 @@ from googleapiclient.discovery import build
 from langgraph.graph import StateGraph
 from typing import TypedDict, Optional
 
+
 WEEKDAYS = {
     "monday": 0,
     "tuesday": 1,
