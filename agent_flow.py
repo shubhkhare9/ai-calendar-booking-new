@@ -269,40 +269,7 @@ def find_free_slots(service, date: datetime.date, duration_minutes=30):
 
 IST = pytz.timezone('Asia/Kolkata')
 
-def run_langgraph(message: str, creds) -> str:
-    print("🔍 Incoming message:", message)
-
-    # Parse date with time
-    parsed_time = dateparser.parse(message, settings={'PREFER_DATES_FROM': 'future'})
-
-    if not parsed_time:
-        return "❌ I couldn't understand the date/time. Please try again."
-
-    # Set default time to 2 PM if time not given
-    parsed_time = parsed_time.replace(hour=14, minute=0, second=0, microsecond=0)
-
-    # Localize to Asia/Kolkata
-    localized_start = IST.localize(parsed_time)
-    localized_end = localized_start + datetime.timedelta(minutes=30)
-
-    # Format datetime to ISO with timezone
-    start_iso = localized_start.isoformat()
-    end_iso = localized_end.isoformat()
-
-    print("📅 Final parsed time (IST):", start_iso)
-
-    service = get_calendar_service(creds)
-
-    if check_availability(service, start_iso, end_iso):
-        book_event(service, "Meeting", start_iso, end_iso)
-        return f"✅ Meeting scheduled for {localized_start.strftime('%Y-%m-%d %I:%M %p')}"
-    else:
-        return f"❌ You're not available at {localized_start.strftime('%Y-%m-%d %I:%M %p')}."
-
 def interpret_fuzzy_time(message: str) -> datetime.datetime:
-    import dateparser
-    import datetime
-
     parsed = dateparser.parse(
         message,
         settings={"PREFER_DATES_FROM": "future"}
@@ -312,8 +279,8 @@ def interpret_fuzzy_time(message: str) -> datetime.datetime:
         return None
 
     text = message.lower()
-    
-    # Set default hour for fuzzy time references
+
+    # Set hour defaults for fuzzy parts of day
     if "afternoon" in text:
         parsed = parsed.replace(hour=14, minute=0)
     elif "evening" in text:
@@ -323,4 +290,25 @@ def interpret_fuzzy_time(message: str) -> datetime.datetime:
     elif "night" in text:
         parsed = parsed.replace(hour=21, minute=0)
 
+    # Localize to IST
+    IST = pytz.timezone("Asia/Kolkata")
+    parsed = IST.localize(parsed)
+
     return parsed
+
+def run_langgraph(message: str, creds) -> str:
+    print("🔍 Incoming message:", message)
+
+    start_time = interpret_fuzzy_time(message)
+    if not start_time:
+        return "❌ I couldn't understand the date/time. Please try again."
+
+    end_time = start_time + datetime.timedelta(minutes=30)
+
+    service = get_calendar_service(creds)
+
+    if check_availability(service, format_datetime(start_time), format_datetime(end_time)):
+        book_event(service, "Call", format_datetime(start_time), format_datetime(end_time))
+        return f"✅ Call scheduled for {start_time.strftime('%Y-%m-%d %I:%M %p')}"
+    else:
+        return "❌ You're not available at that time."
