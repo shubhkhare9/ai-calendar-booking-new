@@ -105,6 +105,10 @@ def chat(data: dict):
             scopes=creds_info["scopes"]
         )
 
+        # Refresh the token if expired
+        if creds.expired and creds.refresh_token:
+            creds.refresh(GoogleRequest())
+
         service = build('calendar', 'v3', credentials=creds)
         return {"reply": run_langgraph(user_input)}
 
