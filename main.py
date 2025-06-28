@@ -110,13 +110,17 @@ def chat(data: dict):
         print("🔐 Using credentials:", creds_info)
 
         creds = Credentials(
-            token=creds_info["token"],
-            refresh_token=creds_info["refresh_token"],
-            token_uri=creds_info["token_uri"],
-            client_id=creds_info["client_id"],
-            client_secret=creds_info["client_secret"],
-            scopes=creds_info["scopes"]
+            token=creds_info.get("token"),
+            refresh_token=creds_info.get("refresh_token"),
+            token_uri=creds_info.get("token_uri"),
+            client_id=creds_info.get("client_id"),
+            client_secret=creds_info.get("client_secret"),
+            scopes=creds_info.get("scopes", SCOPES)
         )
+
+        # Validate that all required fields are present
+        if not all([creds.refresh_token, creds.token_uri, creds.client_id, creds.client_secret]):
+            return {"reply": "❌ Missing necessary credential fields. Please reauthorize."}
 
         if creds.expired and creds.refresh_token:
             print("🔄 Token expired. Refreshing...")
