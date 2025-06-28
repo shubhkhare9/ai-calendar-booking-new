@@ -139,3 +139,9 @@ def chat(data: dict):
     except Exception as e:
         print("❌ ERROR in /chat route:", str(e))
         return {"reply": f"❌ Backend error: {str(e)}"}
+
+def get_calendar_service(creds):
+    """
+    Returns a Google Calendar API service instance using the provided credentials.
+    """
+    return build("calendar", "v3", credentials=creds)

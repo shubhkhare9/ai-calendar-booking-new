@@ -12,7 +12,10 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 def get_calendar_service(creds=None):
     if creds is None:
-        raise ValueError("Credentials must be provided.")
+        try:
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        except FileNotFoundError:
+            raise ValueError("Credentials must be provided or 'token.json' must exist.")
     if not creds.valid:
         if creds.expired and creds.refresh_token:
             logging.info("🔄 Refreshing expired token...")
