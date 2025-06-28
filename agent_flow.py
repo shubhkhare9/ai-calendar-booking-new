@@ -269,32 +269,55 @@ def find_free_slots(service, date: datetime.date, duration_minutes=30):
 
 IST = pytz.timezone('Asia/Kolkata')
 
-def interpret_fuzzy_time(message: str) -> datetime.datetime:
-    parsed = dateparser.parse(
-        message,
-        settings={"PREFER_DATES_FROM": "future"}
-    )
+def interpret_fuzzy_time(message: str) -> Optional[datetime.datetime]:
+    try:
+        parsed = dateparser.parse(
+            message,
+            settings={"PREFER_DATES_FROM": "future", "TIMEZONE": "Asia/Kolkata", "RETURN_AS_TIMEZONE_AWARE": True}
+        )
 
-    if not parsed:
+        if not parsed:
+            return None
+
+        text = message.lower()
+
+        # Set hour defaults for fuzzy parts of day
+        if "afternoon" in text:
+            parsed = parsed.replace(hour=14, minute=0)
+        elif "evening" in text:
+            parsed = parsed.replace(hour=18, minute=0)
+        elif "morning" in text:
+            parsed = parsed.replace(hour=10, minute=0)
+        elif "night" in text:
+            parsed = parsed.replace(hour=21, minute=0)
+
+        # Ensure timezone is set
+        if parsed.tzinfo is None:
+            IST = pytz.timezone("Asia/Kolkata")
+            parsed = IST.localize(parsed)
+
+        return parsed
+    except Exception as e:
+        print(f"❌ Error in interpret_fuzzy_time: {e}")
         return None
 
-    text = message.lower()
+    # text = message.lower()
 
-    # Set hour defaults for fuzzy parts of day
-    if "afternoon" in text:
-        parsed = parsed.replace(hour=14, minute=0)
-    elif "evening" in text:
-        parsed = parsed.replace(hour=18, minute=0)
-    elif "morning" in text:
-        parsed = parsed.replace(hour=10, minute=0)
-    elif "night" in text:
-        parsed = parsed.replace(hour=21, minute=0)
+    # # Set hour defaults for fuzzy parts of day
+    # if "afternoon" in text:
+    #     parsed = parsed.replace(hour=14, minute=0)
+    # elif "evening" in text:
+    #     parsed = parsed.replace(hour=18, minute=0)
+    # elif "morning" in text:
+    #     parsed = parsed.replace(hour=10, minute=0)
+    # elif "night" in text:
+    #     parsed = parsed.replace(hour=21, minute=0)
 
-    # Localize to IST
-    IST = pytz.timezone("Asia/Kolkata")
-    parsed = IST.localize(parsed)
+    # # Localize to IST
+    # IST = pytz.timezone("Asia/Kolkata")
+    # parsed = IST.localize(parsed)
 
-    return parsed
+    # return parsed
 
 def run_langgraph(message: str, creds) -> str:
     print("🔍 Incoming message:", message)
