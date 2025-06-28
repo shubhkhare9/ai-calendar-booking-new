@@ -267,42 +267,34 @@ def find_free_slots(service, date: datetime.date, duration_minutes=30):
 
     return free_slots
 
+IST = pytz.timezone('Asia/Kolkata')
 
 def run_langgraph(message: str, creds) -> str:
     print("🔍 Incoming message:", message)
+
+    # Parse date with time
+    parsed_time = dateparser.parse(message, settings={'PREFER_DATES_FROM': 'future'})
+
+    if not parsed_time:
+        return "❌ I couldn't understand the date/time. Please try again."
+
+    # Set default time to 2 PM if time not given
+    parsed_time = parsed_time.replace(hour=14, minute=0, second=0, microsecond=0)
+
+    # Localize to Asia/Kolkata
+    localized_start = IST.localize(parsed_time)
+    localized_end = localized_start + datetime.timedelta(minutes=30)
+
+    # Format datetime to ISO with timezone
+    start_iso = localized_start.isoformat()
+    end_iso = localized_end.isoformat()
+
+    print("📅 Final parsed time (IST):", start_iso)
+
     service = get_calendar_service(creds)
 
-    message_lower = message.lower()
-
-    # Check if user is asking about free time
-    if "free time" in message_lower or "available" in message_lower or "do you have time" in message_lower:
-        # For simplicity, assume "Friday" → 4 days from now (adjust as needed)
-        today = datetime.datetime.now()
-        weekday_map = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
-                       "friday": 4, "saturday": 5, "sunday": 6}
-        date = today.date() + datetime.timedelta(days=1)
-
-        # Try to parse weekday from message
-        for day in weekday_map:
-            if day in message_lower:
-                target_weekday = weekday_map[day]
-                days_ahead = (target_weekday - today.weekday() + 7) % 7
-                date = today.date() + datetime.timedelta(days=days_ahead)
-                break
-
-        slots = find_free_slots(service, date)
-        if not slots:
-            return "❌ You're fully booked on that day."
-        else:
-            return f"✅ You're free at: {', '.join(slots[:5])}"
-
-    # Default: try to schedule for 2PM tomorrow
-    tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
-    start_time = tomorrow.replace(hour=14, minute=0, second=0, microsecond=0)
-    end_time = start_time + datetime.timedelta(minutes=30)
-
-    if check_availability(service, format_datetime(start_time), format_datetime(end_time)):
-        book_event(service, "Meeting", format_datetime(start_time), format_datetime(end_time))
-        return f"✅ Meeting scheduled for {start_time.strftime('%Y-%m-%d %I:%M %p')}"
+    if check_availability(service, start_iso, end_iso):
+        book_event(service, "Meeting", start_iso, end_iso)
+        return f"✅ Meeting scheduled for {localized_start.strftime('%Y-%m-%d %I:%M %p')}"
     else:
-        return "❌ You're not available at that time."
+        return f"❌ You're not available at {localized_start.strftime('%Y-%m-%d %I:%M %p')}."
