@@ -38,7 +38,7 @@ def extract_duration(user_input):
 
 def extract_datetime(user_input):
     text = user_input.lower()
-    now = datetime.datetime.now()
+    now = datetime.now()
     tz = pytz.timezone("Asia/Kolkata")
 
     # Match time ranges like "between 3-5 PM next week"
@@ -63,8 +63,8 @@ def extract_datetime(user_input):
             base_date += timedelta(days=days_ahead)
 
         parsed_day = base_date.date()
-        start_dt = tz.localize(datetime.datetime.combine(parsed_day, dateutil_parser.parse(start_time).time()))
-        end_dt = tz.localize(datetime.datetime.combine(parsed_day, dateutil_parser.parse(end_time).time()))
+        start_dt = tz.localize(datetime.combine(parsed_day, dateutil_parser.parse(start_time).time()))
+        end_dt = tz.localize(datetime.combine(parsed_day, dateutil_parser.parse(end_time).time()))
         return start_dt.isoformat(), end_dt.isoformat()
 
     # Fallback: direct date like "2/7/2025 at 2PM"
@@ -220,7 +220,7 @@ def run_langgraph(message: str, creds) -> str:
     return final.get("message", "🤖 Something went wrong.")
 
 
-def interpret_fuzzy_time(message: str) -> Optional[datetime.datetime]:
+def interpret_fuzzy_time(message: str) -> Optional[datetime]:
     try:
         parsed = dateparser.parse(
             message,
