@@ -59,16 +59,35 @@ def extract_datetime(user_input):
 
     if "tomorrow" in text:
         dt = now + timedelta(days=1)
-        dt = dt.replace(hour=10, minute=0)
+
+        if "night" in text:
+            dt = dt.replace(hour=20, minute=0)
+        elif "afternoon" in text:
+            dt = dt.replace(hour=15, minute=0)
+        elif "morning" in text:
+            dt = dt.replace(hour=9, minute=0)
+        else:
+            dt = dt.replace(hour=10, minute=0)
+
         dt = tz.localize(dt)
         end = dt + timedelta(minutes=30)
         return dt.isoformat(), end.isoformat()
 
+
     if "today" in text:
-        dt = now.replace(hour=10, minute=0)
+        if "night" in text:
+            dt = now.replace(hour=20, minute=0)
+        elif "afternoon" in text:
+            dt = now.replace(hour=15, minute=0)
+        elif "morning" in text:
+            dt = now.replace(hour=9, minute=0)
+        else:
+            dt = now.replace(hour=10, minute=0)
+
         dt = tz.localize(dt)
         end = dt + timedelta(minutes=30)
         return dt.isoformat(), end.isoformat()
+
 
     try:
         dt = dateutil_parser.parse(user_input, fuzzy=True)
