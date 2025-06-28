@@ -107,10 +107,8 @@ def chat(data: dict):
         if not creds_info:
             return {"reply": "❌ User not authenticated. Please visit /authorize."}
 
-        # Log credentials being used
         print("🔐 Using credentials:", creds_info)
 
-        # Create the credentials object
         creds = Credentials(
             token=creds_info.get("token"),
             refresh_token=creds_info.get("refresh_token"),
@@ -120,21 +118,19 @@ def chat(data: dict):
             scopes=creds_info.get("scopes", SCOPES)
         )
 
-        # Validate all required fields
+        # ✅ THIS LINE must pass creds
+        service = get_calendar_service(creds)
+
         if not all([creds.refresh_token, creds.token_uri, creds.client_id, creds.client_secret]):
             return {"reply": "❌ Missing necessary credential fields. Please reauthorize."}
 
-        # Refresh token if expired
         if creds.expired and creds.refresh_token:
             print("🔄 Token expired. Refreshing...")
             creds.refresh(GoogleRequest())
 
-        # Build the calendar service
         print("✅ Building calendar service...")
-        service = get_calendar_service(creds)
 
-        # Run the agent (you might pass `service` to it if needed)
-        print("⚙️ Running LangGraph agent...")
+        # ⚙️ Run LangGraph logic (assuming it internally uses `service`)
         reply = run_langgraph(user_input)
 
         print("✅ Agent reply:", reply)

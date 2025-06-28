@@ -5,16 +5,22 @@ from googleapiclient.discovery import build
 import datetime
 from dateutil import parser as dateutil_parser
 from google.auth.transport.requests import Request
+import logging
+
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
-def get_calendar_service(creds):
+def get_calendar_service(creds=None):
+    if creds is None:
+        raise ValueError("Credentials must be provided.")
     if not creds.valid:
         if creds.expired and creds.refresh_token:
+            logging.info("🔄 Refreshing expired token...")
             creds.refresh(Request())
         else:
             raise ValueError("Invalid credentials provided.")
     return build("calendar", "v3", credentials=creds)
+
 
 def check_availability(service, start_iso, end_iso):
     print("\U0001F50D Checking availability:")
