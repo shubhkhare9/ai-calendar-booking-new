@@ -37,29 +37,85 @@ def extract_duration(user_input):
     return None
 
 def extract_datetime(user_input):
+    text = user_input.lower()
+    now = datetime.datetime.now()
     tz = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(tz)
 
-    parsed = dateparser.parse(
-        user_input,
-        settings={"PREFER_DATES_FROM": "future", "TIMEZONE": "Asia/Kolkata", "RETURN_AS_TIMEZONE_AWARE": True}
+    # Match time ranges like "between 3-5 PM next week"
+    range_match = re.search(
+        r"""between\s+(\d{1,2}(:\d{2})?\s*[ap]m)\s*(?:to|and|[-–])\s*(\d{1,2}(:\d{2})?\s*[ap]m).*?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|tomorrow|today)""",
+        text
     )
 
-    if not parsed:
-        return None, None
+    if range_match:
+        start_time, _, end_time, _, day_ref = range_match.groups()
+        base_date = now
+        if day_ref == "tomorrow":
+            base_date += timedelta(days=1)
+        elif day_ref == "today":
+            pass
+        elif "week" in day_ref:
+            base_date += timedelta(weeks=1)
+        elif day_ref in WEEKDAYS:
+            target_day = WEEKDAYS[day_ref]
+            current_day = now.weekday()
+            days_ahead = (target_day - current_day + 7) % 7
+            base_date += timedelta(days=days_ahead)
 
-    text = user_input.lower()
-    if "afternoon" in text:
-        parsed = parsed.replace(hour=14, minute=0)
-    elif "evening" in text:
-        parsed = parsed.replace(hour=18, minute=0)
-    elif "morning" in text:
-        parsed = parsed.replace(hour=10, minute=0)
-    elif "night" in text:
-        parsed = parsed.replace(hour=21, minute=0)
+        parsed_day = base_date.date()
+        start_dt = tz.localize(datetime.datetime.combine(parsed_day, dateutil_parser.parse(start_time).time()))
+        end_dt = tz.localize(datetime.datetime.combine(parsed_day, dateutil_parser.parse(end_time).time()))
+        return start_dt.isoformat(), end_dt.isoformat()
 
-    end = parsed + timedelta(minutes=30)
-    return parsed.isoformat(), end.isoformat()
+    # Fallback: direct date like "2/7/2025 at 2PM"
+    try:
+        dt = dateutil_parser.parse(user_input, fuzzy=True, dayfirst=True)
+        if dt.tzinfo is None:
+            dt = tz.localize(dt)
+        end = dt + timedelta(minutes=30)
+        return dt.isoformat(), end.isoformat()
+    except:
+        pass
+
+    # Keywords: "tomorrow", "today" + part of day
+    if "tomorrow" in text:
+        dt = now + timedelta(days=1)
+    elif "today" in text:
+        dt = now
+    else:
+        dt = None
+
+    if dt:
+        if "night" in text:
+            dt = dt.replace(hour=20, minute=0)
+        elif "evening" in text:
+            dt = dt.replace(hour=18, minute=0)
+        elif "afternoon" in text:
+            dt = dt.replace(hour=15, minute=0)
+        elif "morning" in text:
+            dt = dt.replace(hour=9, minute=0)
+        else:
+            dt = dt.replace(hour=10, minute=0)
+
+        dt = tz.localize(dt)
+        end = dt + timedelta(minutes=30)
+        return dt.isoformat(), end.isoformat()
+
+    # Match weekdays like "next Friday"
+    for day in WEEKDAYS:
+        if day in text:
+            target_day = WEEKDAYS[day]
+            current_day = now.weekday()
+            days_ahead = (target_day - current_day + 7) % 7
+            if "next" in text and days_ahead == 0:
+                days_ahead = 7
+            dt = now + timedelta(days=days_ahead)
+            dt = dt.replace(hour=10, minute=0)
+            dt = tz.localize(dt)
+            end = dt + timedelta(minutes=30)
+            return dt.isoformat(), end.isoformat()
+
+    return None, None
 
 def node_extract(state: BookingState) -> BookingState:
     state["start"], state["end"] = extract_datetime(state["message"])
@@ -164,43 +220,39 @@ def run_langgraph(message: str, creds) -> str:
     return final.get("message", "🤖 Something went wrong.")
 
 
-def interpret_fuzzy_time(message: str) -> Optional[datetime]:
+def interpret_fuzzy_time(message: str) -> Optional[datetime.datetime]:
     try:
-        # Try parsing directly with strict settings
         parsed = dateparser.parse(
             message,
             settings={
                 "PREFER_DATES_FROM": "future",
                 "TIMEZONE": "Asia/Kolkata",
                 "RETURN_AS_TIMEZONE_AWARE": True,
-                "DATE_ORDER": "DMY",  # Very important for formats like 2/7/2025
-                "RELATIVE_BASE": datetime.now(pytz.timezone("Asia/Kolkata")),
+                "DATE_ORDER": "DMY"
             }
         )
 
         if not parsed:
-            print("❌ Could not parse datetime using dateparser.")
             return None
 
-        message_lower = message.lower()
+        text = message.lower()
 
-        # Set hour defaults for fuzzy phrases
-        if "afternoon" in message_lower:
-            parsed = parsed.replace(hour=14, minute=0)
-        elif "evening" in message_lower:
+        if "afternoon" in text:
+            parsed = parsed.replace(hour=15, minute=0)
+        elif "evening" in text:
             parsed = parsed.replace(hour=18, minute=0)
-        elif "morning" in message_lower:
+        elif "morning" in text:
             parsed = parsed.replace(hour=10, minute=0)
-        elif "night" in message_lower:
+        elif "night" in text:
             parsed = parsed.replace(hour=21, minute=0)
+        elif parsed.time() == datetime.time(0, 0):
+            parsed = parsed.replace(hour=10, minute=0)
 
-        # Localize if not already
         if parsed.tzinfo is None:
             IST = pytz.timezone("Asia/Kolkata")
             parsed = IST.localize(parsed)
 
         return parsed
-
     except Exception as e:
-        print(f"❌ Error parsing fuzzy time: {e}")
+        print(f"❌ Error in interpret_fuzzy_time: {e}")
         return None
