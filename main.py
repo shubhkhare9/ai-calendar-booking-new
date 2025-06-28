@@ -95,17 +95,17 @@ def chat(data: dict):
         if not creds_info:
             return {"reply": "❌ User not authenticated. Please visit /authorize."}
 
-        # ✅ Check required fields BEFORE constructing credentials
-        required_keys = ["refresh_token", "token_uri", "client_id", "client_secret"]
-        for key in required_keys:
-            if not creds_info.get(key):
-                print(f"❌ Missing required field: {key} in credentials.")
-                return {"reply": f"❌ Missing required field: {key}. Please re-authorize at /authorize."}
+        # Create credentials from info dict (works with refresh_token)
+        creds = Credentials(
+            token=creds_info["token"],
+            refresh_token=creds_info["refresh_token"],
+            token_uri=creds_info["token_uri"],
+            client_id=creds_info["client_id"],
+            client_secret=creds_info["client_secret"],
+            scopes=creds_info["scopes"]
+        )
 
-        creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
-
-        # ✅ Run the LangGraph assistant
         return {"reply": run_langgraph(user_input)}
 
     except Exception as e:
