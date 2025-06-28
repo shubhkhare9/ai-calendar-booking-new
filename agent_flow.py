@@ -298,3 +298,29 @@ def run_langgraph(message: str, creds) -> str:
         return f"✅ Meeting scheduled for {localized_start.strftime('%Y-%m-%d %I:%M %p')}"
     else:
         return f"❌ You're not available at {localized_start.strftime('%Y-%m-%d %I:%M %p')}."
+
+def interpret_fuzzy_time(message: str) -> datetime.datetime:
+    import dateparser
+    import datetime
+
+    parsed = dateparser.parse(
+        message,
+        settings={"PREFER_DATES_FROM": "future"}
+    )
+
+    if not parsed:
+        return None
+
+    text = message.lower()
+    
+    # Set default hour for fuzzy time references
+    if "afternoon" in text:
+        parsed = parsed.replace(hour=14, minute=0)
+    elif "evening" in text:
+        parsed = parsed.replace(hour=18, minute=0)
+    elif "morning" in text:
+        parsed = parsed.replace(hour=10, minute=0)
+    elif "night" in text:
+        parsed = parsed.replace(hour=21, minute=0)
+
+    return parsed
