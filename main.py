@@ -6,6 +6,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 import os
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from agent_flow import run_langgraph
 import json
@@ -20,6 +21,9 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 user_tokens = {}
 
 app = FastAPI()
+
+class ChatInput(BaseModel):
+    message: str
 
 app.add_middleware(
     CORSMiddleware,
