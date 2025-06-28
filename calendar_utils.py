@@ -1,4 +1,4 @@
-# calendar_utils.py (Clean & Updated)
+# calendar_utils.py
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
