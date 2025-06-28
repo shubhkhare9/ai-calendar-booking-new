@@ -17,6 +17,9 @@ def get_calendar_service(creds=None):
         except FileNotFoundError:
             from google_auth_oauthlib.flow import InstalledAppFlow
             logging.info("🔑 'token.json' not found. Initiating authentication flow...")
+            import os
+            if not os.path.exists('credentials.json'):
+                raise FileNotFoundError("The file 'credentials.json' is missing. Please ensure it is present in the working directory.")
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
             with open('token.json', 'w') as token:
