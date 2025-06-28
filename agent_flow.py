@@ -162,3 +162,45 @@ def run_langgraph(message: str, creds) -> str:
     final = calendar_graph.invoke(state)
     print("📤 Final state:", final)
     return final.get("message", "🤖 Something went wrong.")
+
+
+def interpret_fuzzy_time(message: str) -> Optional[datetime.datetime]:
+    try:
+        # Try parsing directly with strict settings
+        parsed = dateparser.parse(
+            message,
+            settings={
+                "PREFER_DATES_FROM": "future",
+                "TIMEZONE": "Asia/Kolkata",
+                "RETURN_AS_TIMEZONE_AWARE": True,
+                "DATE_ORDER": "DMY",  # Very important for formats like 2/7/2025
+                "RELATIVE_BASE": datetime.datetime.now(pytz.timezone("Asia/Kolkata")),
+            }
+        )
+
+        if not parsed:
+            print("❌ Could not parse datetime using dateparser.")
+            return None
+
+        message_lower = message.lower()
+
+        # Set hour defaults for fuzzy phrases
+        if "afternoon" in message_lower:
+            parsed = parsed.replace(hour=14, minute=0)
+        elif "evening" in message_lower:
+            parsed = parsed.replace(hour=18, minute=0)
+        elif "morning" in message_lower:
+            parsed = parsed.replace(hour=10, minute=0)
+        elif "night" in message_lower:
+            parsed = parsed.replace(hour=21, minute=0)
+
+        # Localize if not already
+        if parsed.tzinfo is None:
+            IST = pytz.timezone("Asia/Kolkata")
+            parsed = IST.localize(parsed)
+
+        return parsed
+
+    except Exception as e:
+        print(f"❌ Error parsing fuzzy time: {e}")
+        return None
