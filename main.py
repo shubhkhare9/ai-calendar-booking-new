@@ -109,7 +109,15 @@ def chat(data: dict):
         # Log credentials being used
         print("🔐 Using credentials:", creds_info)
 
-        creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
+        creds = Credentials(
+            token=creds_info["token"],
+            refresh_token=creds_info["refresh_token"],
+            token_uri=creds_info["token_uri"],
+            client_id=creds_info["client_id"],
+            client_secret=creds_info["client_secret"],
+            scopes=creds_info["scopes"]
+        )
+
         if creds.expired and creds.refresh_token:
             print("🔄 Token expired. Refreshing...")
             creds.refresh(GoogleRequest())
