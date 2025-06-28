@@ -101,6 +101,10 @@ def chat(data: dict):
         if not creds_info:
             return {"reply": "❌ User not authenticated. Please visit /authorize."}
 
+        # Ensure all necessary fields are present in creds_info
+        if not all(key in creds_info for key in ["refresh_token", "token_uri", "client_id", "client_secret"]):
+            return {"reply": "❌ Missing necessary fields in credentials. Please reauthorize."}
+        
         creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
 
         # Manually refresh if expired
