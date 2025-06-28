@@ -51,6 +51,8 @@ def authorize():
     auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', include_granted_scopes='true')
     return RedirectResponse(auth_url)
 
+import json
+
 @app.get("/callback")
 async def oauth_callback(request: Request):
     code = request.query_params.get("code")
@@ -72,24 +74,12 @@ async def oauth_callback(request: Request):
     flow.fetch_token(code=code)
     credentials = flow.credentials
 
-    # ✅ Print all credential fields to logs
+    # ✅ Log for debugging
     print("==== OAUTH CREDENTIALS ====")
-    print("Token:", credentials.token)
-    print("Refresh Token:", credentials.refresh_token)
     print(credentials.to_json())
-    print("Token URI:", credentials.token_uri)
-    print("Client ID:", credentials.client_id)
-    print("Client Secret:", credentials.client_secret)
     print("============================")
 
-    user_tokens["demo_user"] = {
-        "token": credentials.token,
-        "refresh_token": credentials.refresh_token,
-        "token_uri": credentials.token_uri,
-        "client_id": credentials.client_id,
-        "client_secret": credentials.client_secret,
-        "scopes": credentials.scopes
-    }
+    # ✅ Save the full credential object in proper JSON format
     user_tokens["demo_user"] = json.loads(credentials.to_json())
 
     return JSONResponse(content={"message": "✅ Authorization complete! You can now use the calendar."})
