@@ -1,3 +1,4 @@
+#main.py
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -140,8 +141,8 @@ def chat(data: dict):
         print("❌ ERROR in /chat route:", str(e))
         return {"reply": f"❌ Backend error: {str(e)}"}
 
-def get_calendar_service(creds):
-    """
-    Returns a Google Calendar API service instance using the provided credentials.
-    """
-    return build("calendar", "v3", credentials=creds)
+# def get_calendar_service(creds):
+#     """
+#     Returns a Google Calendar API service instance using the provided credentials.
+#     """
+#     return build("calendar", "v3", credentials=creds)
