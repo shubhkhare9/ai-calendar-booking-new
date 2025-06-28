@@ -82,8 +82,10 @@ async def oauth_callback(request: Request):
     # ✅ Save the full credential object in proper JSON format
     # Ensure refresh_token is included in the saved credentials
     credentials_dict = json.loads(credentials.to_json())
-    if not credentials_dict.get("refresh_token"):
+    if not credentials_dict.get("refresh_token") and credentials.refresh_token:
         credentials_dict["refresh_token"] = credentials.refresh_token
+    elif not credentials_dict.get("refresh_token"):
+        return JSONResponse(content={"message": "❌ Missing refresh_token. Please reauthorize."}, status_code=400)
     user_tokens["demo_user"] = credentials_dict
 
     return JSONResponse(content={"message": "✅ Authorization complete! You can now use the calendar."})
