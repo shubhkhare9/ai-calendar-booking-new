@@ -97,16 +97,33 @@ async def oauth_callback(request: Request):
 
 
 @app.post("/chat")
-@app.post("/chat")
-def chat(data: ChatInput):
-    user_input = data.message
-    print(f"User input: {user_input}")
-    reply = run_langgraph(user_input)
-    return {"reply": reply}
+def chat(data: dict):
+    try:
+        user_input = data.get("message", "")
+        print(f"📨 Incoming message: {user_input}")
 
-@app.post("/chat/langgraph")
-def chat_langgraph(data: ChatInput):
-    user_input = data.message
-    print(f"LangGraph input: {user_input}")
-    reply = run_langgraph(user_input)
-    return {"reply": reply}
+        creds_info = user_tokens.get("demo_user")
+        if not creds_info:
+            return {"reply": "❌ User not authenticated. Please visit /authorize."}
+
+        # Log credentials being used
+        print("🔐 Using credentials:", creds_info)
+
+        creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
+        if creds.expired and creds.refresh_token:
+            print("🔄 Token expired. Refreshing...")
+            creds.refresh(GoogleRequest())
+
+        print("✅ Building calendar service...")
+        service = build('calendar', 'v3', credentials=creds)
+
+        print("⚙️ Running LangGraph agent...")
+        reply = run_langgraph(user_input)
+
+        print("✅ Agent reply:", reply)
+        return {"reply": reply}
+
+    except Exception as e:
+        print("❌ ERROR in /chat route:", str(e))
+        return {"reply": f"❌ Backend error: {str(e)}"}
+
