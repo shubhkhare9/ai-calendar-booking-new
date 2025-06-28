@@ -8,6 +8,7 @@ from googleapiclient.discovery import build
 import os
 from dotenv import load_dotenv
 from agent_flow import run_langgraph
+import json
 
 load_dotenv()
 
@@ -75,6 +76,7 @@ async def oauth_callback(request: Request):
     print("==== OAUTH CREDENTIALS ====")
     print("Token:", credentials.token)
     print("Refresh Token:", credentials.refresh_token)
+    print(credentials.to_json())
     print("Token URI:", credentials.token_uri)
     print("Client ID:", credentials.client_id)
     print("Client Secret:", credentials.client_secret)
@@ -88,6 +90,7 @@ async def oauth_callback(request: Request):
         "client_secret": credentials.client_secret,
         "scopes": credentials.scopes
     }
+    user_tokens["demo_user"] = json.loads(credentials.to_json())
 
     return JSONResponse(content={"message": "✅ Authorization complete! You can now use the calendar."})
 
@@ -102,16 +105,17 @@ def chat(data: dict):
         if not creds_info:
             return {"reply": "❌ User not authenticated. Please visit /authorize."}
 
-        creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
-
-        # Validate refresh_token and other required fields
+        # ✅ Check required fields BEFORE constructing credentials
         required_keys = ["refresh_token", "token_uri", "client_id", "client_secret"]
         for key in required_keys:
             if not creds_info.get(key):
-                return {"reply": f"❌ Missing required field: {key}. Please re-authorize."}
+                print(f"❌ Missing required field: {key} in credentials.")
+                return {"reply": f"❌ Missing required field: {key}. Please re-authorize at /authorize."}
 
+        creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
 
+        # ✅ Run the LangGraph assistant
         return {"reply": run_langgraph(user_input)}
 
     except Exception as e:
