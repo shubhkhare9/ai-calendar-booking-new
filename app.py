@@ -17,7 +17,7 @@ if user_input:
     
     with st.spinner("Thinking..."):
         try:
-            response = requests.post("http://localhost:8000/chat", json={"message": user_input})
+            response = requests.post("https://ai-calendar-backend-r97f.onrender.com/chat", json={"message": user_input})
             reply = response.json().get("reply", "⚠️ Sorry, I couldn't process your request.")
         except requests.exceptions.ConnectionError:
             reply = "❌ Backend is not running. Please start FastAPI with `uvicorn main:app --reload`."
