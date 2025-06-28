@@ -8,6 +8,8 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from langgraph.graph import StateGraph
 from typing import TypedDict, Optional
+from calendar_utils import get_calendar_service, format_datetime
+import datetime
 
 
 WEEKDAYS = {
@@ -234,18 +236,18 @@ workflow.set_finish_point("book")
 
 calendar_graph = workflow.compile()
 
-def run_langgraph(message: str) -> str:
-    state = {
-        "message": message,
-        "start": None,
-        "end": None,
-        "confirmed": False,
-        "summary": None,
-        "duration": None,
-        "route": None,
-        "intent": None
-    }
+def run_langgraph(message: str, creds) -> str:
     print("🔍 Incoming message:", message)
-    final = calendar_graph.invoke(state)
-    print("📤 Final state:", final)
-    return final.get("message", "🤖 Something went wrong.")
+
+    # Dummy example, assuming 2PM tomorrow
+    tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+    start_time = tomorrow.replace(hour=14, minute=0, second=0, microsecond=0)
+    end_time = start_time + datetime.timedelta(minutes=30)
+
+    service = get_calendar_service(creds)
+
+    if check_availability(service, format_datetime(start_time), format_datetime(end_time)):
+        book_event(service, "Meeting", format_datetime(start_time), format_datetime(end_time))
+        return f"✅ Meeting scheduled for {start_time.strftime('%Y-%m-%d %I:%M %p')}"
+    else:
+        return "❌ You're not available at that time."

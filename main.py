@@ -1,17 +1,14 @@
-#main.py
+# === main.py ===
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
-import os
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from agent_flow import run_langgraph
-import json
-from calendar_utils import get_calendar_service
+import os, json
 
 load_dotenv()
 
@@ -57,12 +54,9 @@ def authorize():
     auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', include_granted_scopes='true')
     return RedirectResponse(auth_url)
 
-import json
-
 @app.get("/callback")
 async def oauth_callback(request: Request):
     code = request.query_params.get("code")
-
     flow = Flow.from_client_config(
         {
             "web": {
@@ -76,39 +70,27 @@ async def oauth_callback(request: Request):
         scopes=SCOPES,
         redirect_uri=REDIRECT_URI
     )
-
     flow.fetch_token(code=code)
     credentials = flow.credentials
-
-    # ✅ Log for debugging
-    print("==== OAUTH CREDENTIALS ====")
-    print(credentials.to_json())
-    print("============================")
-
-    # ✅ Save the full credential object in proper JSON format
-    # Ensure refresh_token is included in the saved credentials
     credentials_dict = json.loads(credentials.to_json())
+
     if not credentials_dict.get("refresh_token") and credentials.refresh_token:
         credentials_dict["refresh_token"] = credentials.refresh_token
     elif not credentials_dict.get("refresh_token"):
         return JSONResponse(content={"message": "❌ Missing refresh_token. Please reauthorize."}, status_code=400)
-    user_tokens["demo_user"] = credentials_dict
 
+    user_tokens["demo_user"] = credentials_dict
     return JSONResponse(content={"message": "✅ Authorization complete! You can now use the calendar."})
 
-
-
 @app.post("/chat")
-def chat(data: dict):
+def chat(data: ChatInput):
     try:
-        user_input = data.get("message", "")
+        user_input = data.message
         print(f"📨 Incoming message: {user_input}")
 
         creds_info = user_tokens.get("demo_user")
         if not creds_info:
             return {"reply": "❌ User not authenticated. Please visit /authorize."}
-
-        print("🔐 Using credentials:", creds_info)
 
         creds = Credentials(
             token=creds_info.get("token"),
@@ -119,30 +101,14 @@ def chat(data: dict):
             scopes=creds_info.get("scopes", SCOPES)
         )
 
-        # ✅ THIS LINE must pass creds
-        service = get_calendar_service(creds)
-
-        if not all([creds.refresh_token, creds.token_uri, creds.client_id, creds.client_secret]):
-            return {"reply": "❌ Missing necessary credential fields. Please reauthorize."}
-
         if creds.expired and creds.refresh_token:
             print("🔄 Token expired. Refreshing...")
             creds.refresh(GoogleRequest())
 
-        print("✅ Building calendar service...")
-
-        # ⚙️ Run LangGraph logic (assuming it internally uses `service`)
-        reply = run_langgraph(user_input)
-
+        reply = run_langgraph(user_input, creds)
         print("✅ Agent reply:", reply)
         return {"reply": reply}
 
     except Exception as e:
         print("❌ ERROR in /chat route:", str(e))
         return {"reply": f"❌ Backend error: {str(e)}"}
-
-# def get_calendar_service(creds):
-#     """
-#     Returns a Google Calendar API service instance using the provided credentials.
-#     """
-#     return build("calendar", "v3", credentials=creds)

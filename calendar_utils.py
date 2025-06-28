@@ -12,18 +12,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 def get_calendar_service(creds=None):
     if creds is None:
-        try:
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-        except FileNotFoundError:
-            from google_auth_oauthlib.flow import InstalledAppFlow
-            logging.info("🔑 'token.json' not found. Initiating authentication flow...")
-            import os
-            if not os.path.exists('credentials.json'):
-                raise FileNotFoundError("The file 'credentials.json' is missing. Please ensure it is present in the working directory.")
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
+        raise ValueError("Credentials must be provided.")
     if not creds.valid:
         if creds.expired and creds.refresh_token:
             logging.info("🔄 Refreshing expired token...")
@@ -32,11 +21,10 @@ def get_calendar_service(creds=None):
             raise ValueError("Invalid credentials provided.")
     return build("calendar", "v3", credentials=creds)
 
-
 def check_availability(service, start_iso, end_iso):
-    print("\U0001F50D Checking availability:")
-    print("\u2192 timeMin:", start_iso)
-    print("\u2192 timeMax:", end_iso)
+    print("🔍 Checking availability:")
+    print("→ timeMin:", start_iso)
+    print("→ timeMax:", end_iso)
 
     events_result = service.events().list(
         calendarId='primary',
@@ -61,7 +49,6 @@ def book_event(service, summary, start_time, end_time):
             'timeZone': 'Asia/Kolkata',
         }
     }
-
     return service.events().insert(calendarId='primary', body=event).execute()
 
 def format_datetime(dt):
@@ -70,4 +57,4 @@ def format_datetime(dt):
     elif isinstance(dt, datetime.date):
         return dt.isoformat() + 'T00:00:00'
     else:
-        raise ValueError("Unsupported datetime type. Must be datetime.datetime or datetime.date.")
+        raise ValueError("Unsupported datetime type.")
