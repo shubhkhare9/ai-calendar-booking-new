@@ -25,7 +25,7 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 def get_calendar_service():
     # Replace with the path to your credentials JSON file
-    credentials_path = "C:\Users\Admin\OneDrive\Desktop\AI-calendar-booking-CLEAN\credentials.json"
+    credentials_path = "C:/Users/Admin/OneDrive/Desktop/AI-calendar-booking-CLEAN/credentials.json"
 
     # Load credentials from file
     creds = Credentials.from_authorized_user_file(credentials_path, scopes=["https://www.googleapis.com/auth/calendar"])
