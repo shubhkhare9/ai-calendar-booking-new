@@ -8,7 +8,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from langgraph.graph import StateGraph
 from typing import TypedDict, Optional
-from calendar_utils import get_calendar_service, format_datetime
+from calendar_utils import get_calendar_service, check_availability, book_event, format_datetime
 import datetime
 
 
@@ -236,15 +236,66 @@ workflow.set_finish_point("book")
 
 calendar_graph = workflow.compile()
 
+def find_free_slots(service, date: datetime.date, duration_minutes=30):
+    start_of_day = datetime.datetime.combine(date, datetime.time(9, 0))
+    end_of_day = datetime.datetime.combine(date, datetime.time(18, 0))
+
+    events_result = service.events().list(
+        calendarId='primary',
+        timeMin=start_of_day.isoformat(),
+        timeMax=end_of_day.isoformat(),
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
+
+    busy_times = [(dateutil_parser.parse(e["start"]["dateTime"]),
+                   dateutil_parser.parse(e["end"]["dateTime"]))
+                  for e in events_result.get('items', []) if "dateTime" in e["start"]]
+
+    current = start_of_day
+    free_slots = []
+
+    while current + datetime.timedelta(minutes=duration_minutes) <= end_of_day:
+        is_busy = any(start < current + datetime.timedelta(minutes=duration_minutes) and end > current for start, end in busy_times)
+        if not is_busy:
+            free_slots.append(current.strftime("%I:%M %p"))
+        current += datetime.timedelta(minutes=duration_minutes)
+
+    return free_slots
+
+
 def run_langgraph(message: str, creds) -> str:
     print("🔍 Incoming message:", message)
+    service = get_calendar_service(creds)
 
-    # Dummy example, assuming 2PM tomorrow
+    message_lower = message.lower()
+
+    # Check if user is asking about free time
+    if "free time" in message_lower or "available" in message_lower or "do you have time" in message_lower:
+        # For simplicity, assume "Friday" → 4 days from now (adjust as needed)
+        today = datetime.datetime.now()
+        weekday_map = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                       "friday": 4, "saturday": 5, "sunday": 6}
+        date = today.date() + datetime.timedelta(days=1)
+
+        # Try to parse weekday from message
+        for day in weekday_map:
+            if day in message_lower:
+                target_weekday = weekday_map[day]
+                days_ahead = (target_weekday - today.weekday() + 7) % 7
+                date = today.date() + datetime.timedelta(days=days_ahead)
+                break
+
+        slots = find_free_slots(service, date)
+        if not slots:
+            return "❌ You're fully booked on that day."
+        else:
+            return f"✅ You're free at: {', '.join(slots[:5])}"
+
+    # Default: try to schedule for 2PM tomorrow
     tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
     start_time = tomorrow.replace(hour=14, minute=0, second=0, microsecond=0)
     end_time = start_time + datetime.timedelta(minutes=30)
-
-    service = get_calendar_service(creds)
 
     if check_availability(service, format_datetime(start_time), format_datetime(end_time)):
         book_event(service, "Meeting", format_datetime(start_time), format_datetime(end_time))
