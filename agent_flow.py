@@ -1,16 +1,11 @@
-from calendar_utils import check_availability, book_event
-from datetime import datetime, timedelta
+from calendar_utils import check_availability, book_event, get_calendar_service, format_datetime
+from datetime import datetime, timedelta, time
 import pytz
 import dateparser
 import re
 from dateutil import parser as dateutil_parser
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from langgraph.graph import StateGraph
 from typing import TypedDict, Optional
-from calendar_utils import get_calendar_service, check_availability, book_event, format_datetime
-import datetime
-
+from langgraph.graph import StateGraph
 
 WEEKDAYS = {
     "monday": 0,
@@ -22,103 +17,6 @@ WEEKDAYS = {
     "sunday": 6,
 }
 
-def extract_duration(user_input):
-    match = re.search(r"for\s+(\d{1,2})\s*(hour|minute|minutes|hours)", user_input.lower())
-    if match:
-        value, unit = match.groups()
-        value = int(value)
-        if "hour" in unit:
-            return value * 60
-        return value
-    return None
-
-def extract_datetime(user_input):
-    text = user_input.lower()
-    now = datetime.now()
-    tz = pytz.timezone("Asia/Kolkata")
-
-    range_match = re.search(
-        r"""between\s+(\d{1,2}(:\d{2})?\s*[ap]m)\s*(?:to|and|-)\s*(\d{1,2}(:\d{2})?\s*[ap]m).*?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|tomorrow|today)""",
-        text
-    )
-
-    if range_match:
-        start_time, _, end_time, _, day_ref = range_match.groups()
-        base_date = now
-        if day_ref == "tomorrow":
-            base_date += timedelta(days=1)
-        elif day_ref == "today":
-            pass
-        elif "week" in day_ref:
-            base_date += timedelta(weeks=1)
-        elif day_ref in WEEKDAYS:
-            target_day = WEEKDAYS[day_ref]
-            current_day = now.weekday()
-            days_ahead = (target_day - current_day + 7) % 7
-            base_date += timedelta(days=days_ahead)
-        parsed_day = base_date.date()
-        start_dt = tz.localize(datetime.combine(parsed_day, dateutil_parser.parse(start_time).time()))
-        end_dt = tz.localize(datetime.combine(parsed_day, dateutil_parser.parse(end_time).time()))
-        return (start_dt.isoformat(), end_dt.isoformat())
-
-    if "tomorrow" in text:
-        dt = now + timedelta(days=1)
-
-        if "night" in text:
-            dt = dt.replace(hour=20, minute=0)
-        elif "afternoon" in text:
-            dt = dt.replace(hour=15, minute=0)
-        elif "morning" in text:
-            dt = dt.replace(hour=9, minute=0)
-        else:
-            dt = dt.replace(hour=10, minute=0)
-
-        dt = tz.localize(dt)
-        end = dt + timedelta(minutes=30)
-        return dt.isoformat(), end.isoformat()
-
-
-    if "today" in text:
-        if "night" in text:
-            dt = now.replace(hour=20, minute=0)
-        elif "afternoon" in text:
-            dt = now.replace(hour=15, minute=0)
-        elif "morning" in text:
-            dt = now.replace(hour=9, minute=0)
-        else:
-            dt = now.replace(hour=10, minute=0)
-
-        dt = tz.localize(dt)
-        end = dt + timedelta(minutes=30)
-        return dt.isoformat(), end.isoformat()
-
-
-    try:
-        dt = dateutil_parser.parse(user_input, fuzzy=True)
-        if dt.tzinfo is None:
-            dt = tz.localize(dt)
-        if dt.time() == datetime.min.time():
-            dt = dt.replace(hour=10, minute=0)
-        end = dt + timedelta(minutes=30)
-        return dt.isoformat(), end.isoformat()
-    except:
-        pass
-
-    for day in WEEKDAYS:
-        if day in text:
-            target_day = WEEKDAYS[day]
-            current_day = now.weekday()
-            days_ahead = (target_day - current_day + 7) % 7
-            if "next" in text and days_ahead == 0:
-                days_ahead = 7
-            dt = now + timedelta(days=days_ahead)
-            dt = dt.replace(hour=10, minute=0)
-            dt = tz.localize(dt)
-            end = dt + timedelta(minutes=30)
-            return dt.isoformat(), end.isoformat()
-
-    return None, None
-
 class BookingState(TypedDict):
     message: str
     start: Optional[str]
@@ -128,24 +26,55 @@ class BookingState(TypedDict):
     duration: Optional[int]
     route: Optional[str]
     intent: Optional[str]
+    creds: Optional[any]  # store credentials
+
+def extract_duration(user_input):
+    match = re.search(r"for\s+(\d{1,2})\s*(hour|minute|minutes|hours)", user_input.lower())
+    if match:
+        value, unit = match.groups()
+        value = int(value)
+        return value * 60 if "hour" in unit else value
+    return None
+
+def extract_datetime(user_input):
+    tz = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(tz)
+
+    parsed = dateparser.parse(
+        user_input,
+        settings={"PREFER_DATES_FROM": "future", "TIMEZONE": "Asia/Kolkata", "RETURN_AS_TIMEZONE_AWARE": True}
+    )
+
+    if not parsed:
+        return None, None
+
+    text = user_input.lower()
+    if "afternoon" in text:
+        parsed = parsed.replace(hour=14, minute=0)
+    elif "evening" in text:
+        parsed = parsed.replace(hour=18, minute=0)
+    elif "morning" in text:
+        parsed = parsed.replace(hour=10, minute=0)
+    elif "night" in text:
+        parsed = parsed.replace(hour=21, minute=0)
+
+    end = parsed + timedelta(minutes=30)
+    return parsed.isoformat(), end.isoformat()
 
 def node_extract(state: BookingState) -> BookingState:
-    start, end = extract_datetime(state["message"])
-    duration = extract_duration(state["message"])
-    state["start"] = start
-    state["end"] = end
-    state["duration"] = duration
+    state["start"], state["end"] = extract_datetime(state["message"])
+    state["duration"] = extract_duration(state["message"])
     state["summary"] = "Meeting"
     state["intent"] = "check" if "free" in state["message"].lower() or "available" in state["message"].lower() else "book"
     return state
 
 def node_check(state: BookingState) -> BookingState:
-    from calendar_utils import get_calendar_service
-    service = get_calendar_service()
-
     if not state["start"]:
         state["route"] = "fail"
-    elif state.get("intent") == "check":
+        return state
+
+    service = get_calendar_service(state["creds"])
+    if state["intent"] == "check":
         state["route"] = "suggest"
     elif check_availability(service, state["start"], state["end"]):
         state["route"] = "available"
@@ -158,8 +87,7 @@ def node_confirm(state: BookingState) -> BookingState:
     return state
 
 def node_book(state: BookingState) -> BookingState:
-    from calendar_utils import get_calendar_service
-    service = get_calendar_service()
+    service = get_calendar_service(state["creds"])
     event = book_event(service, state["summary"], state["start"], state["end"])
     start_fmt = dateutil_parser.parse(state["start"]).strftime('%B %d, %Y at %I:%M %p')
     end_fmt = dateutil_parser.parse(state["end"]).strftime('%I:%M %p')
@@ -170,48 +98,30 @@ def node_fail(state: BookingState) -> BookingState:
     state["message"] = "❌ I couldn't understand the date/time. Please try again."
     return state
 
-def node_suggest(state: BookingState) -> BookingState:
-    from calendar_utils import get_calendar_service
-    from dateutil import parser as date_parser
-    import traceback
-
-    service = get_calendar_service()
-    tz = pytz.timezone("Asia/Kolkata")
-
-    suggestions = []
-    try:
-        raw_start = state.get("start")
-        duration = state.get("duration") or 30
-
-        dt = date_parser.parse(raw_start) if raw_start else datetime.now(tz)
-        if dt.tzinfo is None:
-            dt = tz.localize(dt)
-        else:
-            dt = dt.astimezone(tz)
-
-        base = dt.replace(hour=9, minute=0, second=0, microsecond=0)
-
-        for i in range(18):
-            trial_start = base + timedelta(minutes=30 * i)
-            trial_end = trial_start + timedelta(minutes=duration)
-            if trial_end.hour >= 18:
-                break
-            if check_availability(service, trial_start.isoformat(), trial_end.isoformat()):
-                suggestions.append(trial_start.strftime("%I:%M %p"))
-            if len(suggestions) >= 5:
-                break
-
-        state["message"] = f"🗓️ You're free on that day at: {', '.join(suggestions)}." if suggestions else "❌ You're busy all day. No free slots found."
-
-    except Exception as e:
-        print("❌ Exception in node_suggest:", e)
-        traceback.print_exc()
-        state["message"] = "❌ Failed to suggest slots due to internal error."
-
-    return state
-
 def node_busy(state: BookingState) -> BookingState:
     state["message"] = "❌ You're busy at that time. Please suggest another slot."
+    return state
+
+def node_suggest(state: BookingState) -> BookingState:
+    service = get_calendar_service(state["creds"])
+    tz = pytz.timezone("Asia/Kolkata")
+    suggestions = []
+
+    base = dateutil_parser.parse(state["start"]).astimezone(tz)
+    base = base.replace(hour=9, minute=0, second=0, microsecond=0)
+    duration = state.get("duration") or 30
+
+    for i in range(18):
+        trial_start = base + timedelta(minutes=30 * i)
+        trial_end = trial_start + timedelta(minutes=duration)
+        if trial_end.hour >= 18:
+            break
+        if check_availability(service, trial_start.isoformat(), trial_end.isoformat()):
+            suggestions.append(trial_start.strftime("%I:%M %p"))
+        if len(suggestions) >= 5:
+            break
+
+    state["message"] = f"🗓️ You're free on that day at: {', '.join(suggestions)}." if suggestions else "❌ You're busy all day. No free slots found."
     return state
 
 workflow = StateGraph(BookingState)
@@ -236,102 +146,19 @@ workflow.set_finish_point("book")
 
 calendar_graph = workflow.compile()
 
-def find_free_slots(service, date: datetime.date, duration_minutes=30):
-    IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-    start_of_day = datetime.datetime.combine(date, datetime.time(9, 0)).replace(tzinfo=IST)
-    end_of_day = datetime.datetime.combine(date, datetime.time(18, 0)).replace(tzinfo=IST)
-
-    events_result = service.events().list(
-        calendarId='primary',
-        timeMin=start_of_day.isoformat(),
-        timeMax=end_of_day.isoformat(),
-        singleEvents=True,
-        orderBy='startTime'
-    ).execute()
-
-    busy_times = [
-        (dateutil_parser.parse(e["start"]["dateTime"]),
-         dateutil_parser.parse(e["end"]["dateTime"]))
-        for e in events_result.get("items", []) if "dateTime" in e["start"]
-    ]
-
-    current = start_of_day
-    free_slots = []
-
-    while current + datetime.timedelta(minutes=duration_minutes) <= end_of_day:
-        is_busy = any(start < current + datetime.timedelta(minutes=duration_minutes) and end > current
-                      for start, end in busy_times)
-        if not is_busy:
-            free_slots.append(current.strftime("%I:%M %p"))
-        current += datetime.timedelta(minutes=duration_minutes)
-
-    return free_slots
-
-IST = pytz.timezone('Asia/Kolkata')
-
-def interpret_fuzzy_time(message: str) -> Optional[datetime.datetime]:
-    try:
-        parsed = dateparser.parse(
-            message,
-            settings={"PREFER_DATES_FROM": "future", "TIMEZONE": "Asia/Kolkata", "RETURN_AS_TIMEZONE_AWARE": True}
-        )
-
-        if not parsed:
-            return None
-
-        text = message.lower()
-
-        # Set hour defaults for fuzzy parts of day
-        if "afternoon" in text:
-            parsed = parsed.replace(hour=14, minute=0)
-        elif "evening" in text:
-            parsed = parsed.replace(hour=18, minute=0)
-        elif "morning" in text:
-            parsed = parsed.replace(hour=10, minute=0)
-        elif "night" in text:
-            parsed = parsed.replace(hour=21, minute=0)
-
-        # Ensure timezone is set
-        if parsed.tzinfo is None:
-            IST = pytz.timezone("Asia/Kolkata")
-            parsed = IST.localize(parsed)
-
-        return parsed
-    except Exception as e:
-        print(f"❌ Error in interpret_fuzzy_time: {e}")
-        return None
-
-    # text = message.lower()
-
-    # # Set hour defaults for fuzzy parts of day
-    # if "afternoon" in text:
-    #     parsed = parsed.replace(hour=14, minute=0)
-    # elif "evening" in text:
-    #     parsed = parsed.replace(hour=18, minute=0)
-    # elif "morning" in text:
-    #     parsed = parsed.replace(hour=10, minute=0)
-    # elif "night" in text:
-    #     parsed = parsed.replace(hour=21, minute=0)
-
-    # # Localize to IST
-    # IST = pytz.timezone("Asia/Kolkata")
-    # parsed = IST.localize(parsed)
-
-    # return parsed
-
 def run_langgraph(message: str, creds) -> str:
+    state = {
+        "message": message,
+        "start": None,
+        "end": None,
+        "confirmed": False,
+        "summary": None,
+        "duration": None,
+        "route": None,
+        "intent": None,
+        "creds": creds
+    }
     print("🔍 Incoming message:", message)
-
-    start_time = interpret_fuzzy_time(message)
-    if not start_time:
-        return "❌ I couldn't understand the date/time. Please try again."
-
-    end_time = start_time + datetime.timedelta(minutes=30)
-
-    service = get_calendar_service(creds)
-
-    if check_availability(service, format_datetime(start_time), format_datetime(end_time)):
-        book_event(service, "Call", format_datetime(start_time), format_datetime(end_time))
-        return f"✅ Call scheduled for {start_time.strftime('%Y-%m-%d %I:%M %p')}"
-    else:
-        return "❌ You're not available at that time."
+    final = calendar_graph.invoke(state)
+    print("📤 Final state:", final)
+    return final.get("message", "🤖 Something went wrong.")
