@@ -20,7 +20,6 @@ user_tokens = {}
 
 app = FastAPI()
 
-# Allow CORS for Streamlit frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
