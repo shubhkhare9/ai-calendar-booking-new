@@ -164,7 +164,7 @@ def run_langgraph(message: str, creds) -> str:
     return final.get("message", "🤖 Something went wrong.")
 
 
-def interpret_fuzzy_time(message: str) -> Optional[datetime.datetime]:
+def interpret_fuzzy_time(message: str) -> Optional[datetime]:
     try:
         # Try parsing directly with strict settings
         parsed = dateparser.parse(
@@ -174,7 +174,7 @@ def interpret_fuzzy_time(message: str) -> Optional[datetime.datetime]:
                 "TIMEZONE": "Asia/Kolkata",
                 "RETURN_AS_TIMEZONE_AWARE": True,
                 "DATE_ORDER": "DMY",  # Very important for formats like 2/7/2025
-                "RELATIVE_BASE": datetime.datetime.now(pytz.timezone("Asia/Kolkata")),
+                "RELATIVE_BASE": datetime.now(pytz.timezone("Asia/Kolkata")),
             }
         )
 

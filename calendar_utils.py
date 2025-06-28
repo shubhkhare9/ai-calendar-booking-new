@@ -52,13 +52,13 @@ def book_event(service, summary, start_time, end_time):
     return service.events().insert(calendarId='primary', body=event).execute()
 
 def format_datetime(dt):
-    if isinstance(dt, datetime.datetime):
+    if isinstance(dt, datetime):
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
         return dt.isoformat()
     elif isinstance(dt, datetime.date):
-        dt = datetime.datetime.combine(dt, datetime.time(0, 0))
+        dt = datetime.combine(dt, datetime.time(0, 0))
         dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
         return dt.isoformat()
     else:
-        raise ValueError("Unsupported datetime type. Must be datetime.datetime or datetime.date.")
+        raise ValueError("Unsupported datetime type. Must be datetime or datetime.date.")
