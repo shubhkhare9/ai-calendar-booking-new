@@ -15,7 +15,12 @@ def get_calendar_service(creds=None):
         try:
             creds = Credentials.from_authorized_user_file('token.json', SCOPES)
         except FileNotFoundError:
-            raise ValueError("Credentials must be provided or 'token.json' must exist.")
+            from google_auth_oauthlib.flow import InstalledAppFlow
+            logging.info("🔑 'token.json' not found. Initiating authentication flow...")
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+            with open('token.json', 'w') as token:
+                token.write(creds.to_json())
     if not creds.valid:
         if creds.expired and creds.refresh_token:
             logging.info("🔄 Refreshing expired token...")
