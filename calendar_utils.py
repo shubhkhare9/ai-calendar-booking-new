@@ -10,20 +10,33 @@ import pickle
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
+# def get_calendar_service():
+#     creds = Credentials(
+#         token=None,
+#         refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
+#         token_uri="https://oauth2.googleapis.com/token",
+#         client_id=os.getenv("GOOGLE_CLIENT_ID"),
+#         client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+#         scopes=["https://www.googleapis.com/auth/calendar"]
+#     )
+
+#     service = build('calendar', 'v3', credentials=creds)
+#     return service
+
 def get_calendar_service():
-    creds = Credentials(
-        token=None,
-        refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=os.getenv("GOOGLE_CLIENT_ID"),
-        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=["https://www.googleapis.com/auth/calendar"]
-    )
+    # Replace with the path to your credentials JSON file
+    credentials_path = "path/to/your/credentials.json"
 
-    service = build('calendar', 'v3', credentials=creds)
+    # Load credentials from file
+    creds = Credentials.from_authorized_user_file(credentials_path, scopes=["https://www.googleapis.com/auth/calendar"])
+
+    # Ensure the credentials contain the necessary fields
+    if not creds.valid and creds.refresh_token:
+        creds.refresh(Request())
+
+    # Build the Google Calendar service
+    service = build("calendar", "v3", credentials=creds)
     return service
-
-
 
 def check_availability(service, start_iso, end_iso):
 
