@@ -68,37 +68,29 @@ async def oauth_callback(request: Request):
         redirect_uri=REDIRECT_URI
     )
 
-    try:
-        flow.fetch_token(code=code)
-        credentials = flow.credentials
+    flow.fetch_token(code=code)
+    credentials = flow.credentials
 
-        # ❗ Validate refresh_token presence
-        if not credentials.refresh_token:
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "error": "⚠️ No refresh_token received. Please remove app access from Google account and re-authorize: https://myaccount.google.com/permissions"
-                }
-            )
+    # ✅ Print all credential fields to logs
+    print("==== OAUTH CREDENTIALS ====")
+    print("Token:", credentials.token)
+    print("Refresh Token:", credentials.refresh_token)
+    print("Token URI:", credentials.token_uri)
+    print("Client ID:", credentials.client_id)
+    print("Client Secret:", credentials.client_secret)
+    print("============================")
 
-        # ✅ Save full credentials
-        user_tokens["demo_user"] = {
-            "token": credentials.token,
-            "refresh_token": credentials.refresh_token,
-            "token_uri": credentials.token_uri,
-            "client_id": credentials.client_id,
-            "client_secret": credentials.client_secret,
-            "scopes": credentials.scopes
-        }
+    user_tokens["demo_user"] = {
+        "token": credentials.token,
+        "refresh_token": credentials.refresh_token,
+        "token_uri": credentials.token_uri,
+        "client_id": credentials.client_id,
+        "client_secret": credentials.client_secret,
+        "scopes": credentials.scopes
+    }
 
-        print("🔐 Credentials saved:")
-        print(user_tokens["demo_user"])
+    return JSONResponse(content={"message": "✅ Authorization complete! You can now use the calendar."})
 
-        return JSONResponse(content={"message": "✅ Authorization complete! You can now use the calendar."})
-
-    except Exception as e:
-        print("❌ Error during callback:", e)
-        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.post("/chat")
