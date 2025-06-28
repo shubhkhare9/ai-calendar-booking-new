@@ -101,17 +101,9 @@ def chat(data: dict):
         if not creds_info:
             return {"reply": "❌ User not authenticated. Please visit /authorize."}
 
-        # Create credentials from info dict (works with refresh_token)
-        creds = Credentials(
-            token=creds_info["token"],
-            refresh_token=creds_info["refresh_token"],
-            token_uri=creds_info["token_uri"],
-            client_id=creds_info["client_id"],
-            client_secret=creds_info["client_secret"],
-            scopes=creds_info["scopes"]
-        )
+        creds = Credentials.from_authorized_user_info(info=creds_info, scopes=SCOPES)
 
-        # Refresh the token if expired
+        # Manually refresh if expired
         if creds.expired and creds.refresh_token:
             creds.refresh(GoogleRequest())
 
