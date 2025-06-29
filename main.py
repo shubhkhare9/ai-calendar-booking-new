@@ -24,7 +24,10 @@ def root():
     return {"message": "🚀 AI Calendar Backend is running!"}
 
 def get_calendar_creds():
-    token_data = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
+    try:
+        token_data = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
+    except KeyError:
+        raise ValueError("❌ GOOGLE_CALENDAR_TOKEN environment variable is missing or invalid.")
     creds = Credentials.from_authorized_user_info(token_data, scopes=["https://www.googleapis.com/auth/calendar"])
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
