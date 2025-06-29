@@ -7,17 +7,19 @@ from dateutil import parser as dateutil_parser
 from google.auth.transport.requests import Request
 import logging, os, pickle, json
 import streamlit as st
+from datetime import datetime, timedelta, timezone
+
 
 
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 def get_calendar_service():
-    token_json = json.loads(st.secrets["calendar"]["token"])
-    creds = Credentials.from_authorized_user_info(token_json, scopes=["https://www.googleapis.com/auth/calendar"])
-    service = build('calendar', 'v3', credentials=creds)
-    return service
-
+    token_json = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
+    creds = Credentials.from_authorized_user_info(token_json, scopes=SCOPES)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+    return build('calendar', 'v3', credentials=creds)
 
 def check_availability(service, start_iso, end_iso):
     print("🔍 Checking availability:")
@@ -52,11 +54,17 @@ def book_event(service, summary, start_time, end_time):
 def format_datetime(dt):
     if isinstance(dt, datetime):
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
+            dt = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
         return dt.isoformat()
     elif isinstance(dt, datetime.date):
-        dt = datetime.combine(dt, datetime.time(0, 0))
-        dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
+        dt = datetime.combine(dt, datetime.min.time())
+        dt = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
         return dt.isoformat()
     else:
         raise ValueError("Unsupported datetime type. Must be datetime or datetime.date.")
+    
+# @st.cache_resource
+# def load_credentials():
+#     token_json = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
+#     creds = Credentials.from_authorized_user_info(token_json, scopes=SCOPES)
+#     return creds
