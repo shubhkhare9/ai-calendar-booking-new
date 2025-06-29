@@ -1,5 +1,6 @@
 # === calendar_utils.py ===
 from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,13 @@ import json, os
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
+flow = InstalledAppFlow.from_client_secrets_file("client_secret_209908786560-l5lqhtplip1eq9lsb7rr4evgd1sctnku.apps.googleusercontent.com.json", SCOPES)
+creds = flow.run_local_server(port=0)
+
+# Save the new token
+with open("token.json", "w") as token_file:
+    token_file.write(creds.to_json())
+    
 def get_calendar_service():
     token_json = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
     creds = Credentials.from_authorized_user_info(token_json, scopes=SCOPES)
