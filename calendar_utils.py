@@ -1,16 +1,10 @@
-# calendar_utils.py
-
+# === calendar_utils.py ===
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-import datetime
-from dateutil import parser as dateutil_parser
 from google.auth.transport.requests import Request
-import logging, os, pickle, json
-import streamlit as st
 from datetime import datetime, timedelta, timezone
-
-
-
+from dateutil import parser as dateutil_parser
+import json, os
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
@@ -62,9 +56,3 @@ def format_datetime(dt):
         return dt.isoformat()
     else:
         raise ValueError("Unsupported datetime type. Must be datetime or datetime.date.")
-    
-# @st.cache_resource
-# def load_credentials():
-#     token_json = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
-#     creds = Credentials.from_authorized_user_info(token_json, scopes=SCOPES)
-#     return creds

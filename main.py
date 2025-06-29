@@ -1,30 +1,18 @@
 # === main.py ===
-from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
-from pydantic import BaseModel
-# from dotenv import load_dotenv
 from agent_flow import run_langgraph
 import os, json
-
-# load_dotenv()
-
-# CLIENT_ID = os.getenv("CLIENT_ID")
-# CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-# REDIRECT_URI = os.getenv("REDIRECT_URI")
-# SCOPES = ["https://www.googleapis.com/auth/calendar"]
-
-# user_tokens = {}
 
 app = FastAPI()
 
 class ChatInput(BaseModel):
     message: str
 
-# ✅ Enable CORS
+# ✅ CORS: allow frontend like Streamlit to access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,10 +25,12 @@ app.add_middleware(
 def root():
     return {"message": "🚀 AI Calendar Backend is running!"}
 
-# ✅ Load your calendar credentials from environment variable
+# ✅ Load static token from Render env
 def get_calendar_creds():
     token_data = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
     creds = Credentials.from_authorized_user_info(token_data, scopes=["https://www.googleapis.com/auth/calendar"])
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
     return creds
 
 @app.post("/chat")
@@ -50,10 +40,8 @@ def chat(data: ChatInput):
         print(f"📨 Incoming message: {user_input}")
 
         creds = get_calendar_creds()
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-
         reply = run_langgraph(user_input, creds)
+
         print("✅ Agent reply:", reply)
         return {"reply": reply}
 
