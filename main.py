@@ -1,4 +1,3 @@
-# === main.py ===
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,7 +11,6 @@ app = FastAPI()
 class ChatInput(BaseModel):
     message: str
 
-# ✅ CORS: allow frontend like Streamlit to access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,7 +23,6 @@ app.add_middleware(
 def root():
     return {"message": "🚀 AI Calendar Backend is running!"}
 
-# ✅ Load static token from Render env
 def get_calendar_creds():
     token_data = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
     creds = Credentials.from_authorized_user_info(token_data, scopes=["https://www.googleapis.com/auth/calendar"])
@@ -36,15 +33,8 @@ def get_calendar_creds():
 @app.post("/chat")
 def chat(data: ChatInput):
     try:
-        user_input = data.message
-        print(f"📨 Incoming message: {user_input}")
-
         creds = get_calendar_creds()
-        reply = run_langgraph(user_input, creds)
-
-        print("✅ Agent reply:", reply)
+        reply = run_langgraph(data.message, creds)
         return {"reply": reply}
-
     except Exception as e:
-        print("❌ ERROR in /chat route:", str(e))
         return {"reply": f"❌ Backend error: {str(e)}"}
