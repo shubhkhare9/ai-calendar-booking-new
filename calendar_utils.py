@@ -1,33 +1,19 @@
 # === calendar_utils.py ===
+import os
+import json
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
-from datetime import datetime, timedelta, timezone
-from dateutil import parser as dateutil_parser
-import json, os
+from dotenv import load_dotenv
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
+load_dotenv()
 
-flow = InstalledAppFlow.from_client_secrets_file("client_secret_209908786560-l5lqhtplip1eq9lsb7rr4evgd1sctnku.apps.googleusercontent.com.json", SCOPES)
-creds = flow.run_local_server(port=0)
-
-# Save the new token
-with open("token.json", "w") as token_file:
-    token_file.write(creds.to_json())
-    
-def get_calendar_service():
-    token_json = json.loads(os.environ["GOOGLE_CALENDAR_TOKEN"])
-    creds = Credentials.from_authorized_user_info(token_json, scopes=SCOPES)
-    if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-    return build('calendar', 'v3', credentials=creds)
+# def get_calendar_service():
+#     token_info = json.loads(os.getenv("GOOGLE_CALENDAR_TOKEN"))
+#     creds = Credentials.from_authorized_user_info(token_info)
+#     service = build("calendar", "v3", credentials=creds)
+#     return service
 
 def check_availability(service, start_iso, end_iso):
-    print("🔍 Checking availability:")
-    print("→ timeMin:", start_iso)
-    print("→ timeMax:", end_iso)
-
     events_result = service.events().list(
         calendarId='primary',
         timeMin=start_iso,
@@ -35,32 +21,31 @@ def check_availability(service, start_iso, end_iso):
         singleEvents=True,
         orderBy='startTime'
     ).execute()
-
     events = events_result.get('items', [])
     return len(events) == 0
 
 def book_event(service, summary, start_time, end_time):
     event = {
         'summary': summary,
-        'start': {
-            'dateTime': start_time,
-            'timeZone': 'Asia/Kolkata',
-        },
-        'end': {
-            'dateTime': end_time,
-            'timeZone': 'Asia/Kolkata',
-        }
+        'start': {'dateTime': start_time, 'timeZone': 'Asia/Kolkata'},
+        'end': {'dateTime': end_time, 'timeZone': 'Asia/Kolkata'},
     }
     return service.events().insert(calendarId='primary', body=event).execute()
 
+def get_calendar_service():
+    token_info = json.loads(os.getenv("GOOGLE_CALENDAR_TOKEN"))
+    creds = Credentials.from_authorized_user_info(token_info)
+    return build("calendar", "v3", credentials=creds)
+
 def format_datetime(dt):
-    if isinstance(dt, datetime):
+    import datetime
+    if isinstance(dt, datetime.datetime):
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
         return dt.isoformat()
     elif isinstance(dt, datetime.date):
-        dt = datetime.combine(dt, datetime.min.time())
-        dt = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+        dt = datetime.datetime.combine(dt, datetime.time(0, 0))
+        dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
         return dt.isoformat()
     else:
         raise ValueError("Unsupported datetime type. Must be datetime or datetime.date.")
